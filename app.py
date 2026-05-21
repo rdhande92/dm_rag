@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import os
 import PyPDF2
 import faiss
@@ -13,6 +14,7 @@ import json
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # Configuration
 data_folder = "data"
@@ -276,7 +278,7 @@ def call_grok_api(prompt):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.2,
-        "max_tokens": 50
+        "max_tokens": 500
     }
     
     try:
@@ -286,6 +288,17 @@ def call_grok_api(prompt):
         return result["choices"][0]["message"]["content"]
     except requests.exceptions.RequestException as e:
         return f"Error calling Grok API: {str(e)}"
+
+
+# ==================== WEB UI ROUTES ====================
+
+@app.route("/", methods=["GET"])
+@app.route("/index.html", methods=["GET"])
+def serve_ui():
+    """
+    Serve the RAG Chatbot UI.
+    """
+    return render_template("index.html")
 
 
 # ==================== API ENDPOINTS ====================
@@ -507,15 +520,32 @@ if __name__ == "__main__":
     print("="*80)
     print("RAG PIPELINE WITH FAISS DB")
     print("="*80)
-    print("\nAvailable endpoints:")
+    print("\n🌐 Web UI:")
+    print("  - http://127.0.0.1:5000/")
+    print("  - http://127.0.0.1:5000/index.html")
+    print("\n📡 Available API endpoints:")
     print("  - GET  /create_db - Initialize RAG database from PDFs")
     print("  - POST /get_query_answer - Query the RAG pipeline")
     print("  - GET  /status - Check pipeline status")
     print("  - GET  /health - Health check")
-    print("\nDocumentation:")
+    print("\n📋 Setup Instructions:")
     print("  1. Place PDF files in the 'data' folder")
-    print("  2. Call GET /create_db to build the FAISS index")
-    print("  3. Use POST /get_query_answer to query the system")
-    print("="*80 + "\n")
+    print("  2. Open http://127.0.0.1:5000 in your browser")
+    print("  3. Click 'Initialize Database' to build the FAISS index")
+    print("  4. Start asking questions!")
+    print("="*80)
+    
+    # Auto-load FAISS index if it exists
+    print("\n🔍 Checking for existing FAISS index...")
+    if os.path.exists(faiss_index_file) and os.path.exists(chunks_metadata_file):
+        print("✓ Found existing FAISS index. Loading...")
+        try:
+            load_faiss_index()
+            print("✓ Database loaded successfully!")
+        except Exception as e:
+            print(f"✗ Error loading database: {str(e)}")
+    else:
+        print("✗ No existing FAISS index found.")
+        print("  Please click 'Initialize Database' in the UI to create one.\n")
     
     app.run(debug=True)
